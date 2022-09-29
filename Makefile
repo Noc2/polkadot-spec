@@ -3,7 +3,7 @@ SOURCES := $(TARGET).adoc $(wildcard ??_*.adoc) $(wildcard ??_*/*.adoc) $(wildca
 
 CACHEDIR := cache/
 
-.PHONY: default html pdf tex kaitai test test-metadata clean
+.PHONY: default html pdf tex kaitai test test-metadata check clean
 
 
 default: html
@@ -28,23 +28,20 @@ $(TARGET).tex: $(SOURCES)
 	asciidoctor-latex $(SHARED_FLAGS) -o $@ $<
 
 
-kaitai: metadata.ksy
+kaitai: block_header.ksy metadata.ksy
 
 %.ksy: $(SOURCES) asciidoctor-kaitai.rb
 	asciidoctor -r ./asciidoctor-kaitai.rb -b kaitai -o $@ $< --failure-level=WARN
 
-
-test/metadata.rb: metadata.ksy
+test/%.rb: %.ksy
 	ksc --target ruby --outdir ./test/ $<
 
-test/block_header.rb: block_header.ksy
-	ksc --target ruby --outdir ./test/ $<
 
-test/blockheader.bin:
+test/block_header.bin:
 	curl -X POST -H 'Content-Type: application/json' -d '{"id":"1", "jsonrpc":"2.0", "method":"chain_getHeader"}' 'https://rpc.polkadot.io' | jq .result | xxd -r -p > $@
 
 test/metadata.bin:
-	curl -X POST -H 'Content-Type: application/json' -d '{"id":"1", "jsonrpc":"2.0", "method":"state_getMetadata"}' 'https://rpc.polkadot.io' | jq .result | xxd -r -p > $@
+	curl -X POST -H 'Content-Type: application/json' -d '{"id":"2", "jsonrpc":"2.0", "method":"state_getMetadata"}' 'https://rpc.polkadot.io' | jq .result | xxd -r -p > $@
 
 
 test: test-metadata
@@ -53,5 +50,9 @@ test-metadata: test/scale.fixed.rb test/metadata.rb test/metadata.bin
 	ruby ./test/test_metadata.rb
 
 
+check: 
+	misspell -locale=US $(SOURCES)
+  
+  
 clean:
-	rm -rf $(CACHEDIR) $(TARGET).{html,pdf,tex} metadata.ksy test/{scale,metadata}.rb test/metadata.bin
+	rm -rf $(CACHEDIR) $(TARGET).{html,pdf,tex} {block_header,metadata}.ksy test/{scale,block_header,metadata}.rb test/{block_header,metadata}.bin
